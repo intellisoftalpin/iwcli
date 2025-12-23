@@ -24,7 +24,8 @@ pub fn generate_totp(secret: &str) -> Option<(String, u64)> {
         // Assume raw base32 secret - decode it properly
         let secret_clean = secret.replace(' ', "").to_uppercase();
         let decoded = base32::decode(Alphabet::Rfc4648 { padding: false }, &secret_clean)?;
-        TOTP::new(
+        // Use new_unchecked to allow secrets shorter than 128 bits (many authenticators use 80-bit secrets)
+        TOTP::new_unchecked(
             Algorithm::SHA1,
             6,
             1,
@@ -32,7 +33,7 @@ pub fn generate_totp(secret: &str) -> Option<(String, u64)> {
             decoded,
             None,
             "".to_string(),
-        ).ok()?
+        )
     };
 
     let now = SystemTime::now()
@@ -204,16 +205,8 @@ pub fn draw_right_panel(frame: &mut Frame, app: &App, area: Rect) {
                     Style::default().fg(Color::White)
                 };
 
-                // Check if this is a 2FA field
-                let display_value = if field.field_type == "2FAC" {
-                    if let Some((code, remaining)) = generate_totp(&field.value) {
-                        format!("{} ({}s)", code, remaining)
-                    } else {
-                        field.value.clone()
-                    }
-                } else {
-                    field.value.clone()
-                };
+                // For 2FA fields, show raw secret in panel (TOTP code shown in popup dialog)
+                let display_value = field.value.clone();
 
                 let display_text = format!("{}: {}", field.label, display_value);
                 items.push(ListItem::new(Line::from(Span::styled(display_text, style))));
