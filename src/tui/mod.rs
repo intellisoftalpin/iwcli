@@ -11,7 +11,7 @@ mod ui;
 use std::io;
 use std::path::Path;
 
-use crossterm::{
+use ratatui::crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -48,7 +48,7 @@ pub fn run(wallet_path: Option<&str>) -> io::Result<()> {
 }
 
 /// Main application loop
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
+fn run_app<B: Backend<Error = io::Error>>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
     let mut mouse_captured = true;
 
     loop {

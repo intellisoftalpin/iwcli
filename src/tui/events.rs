@@ -1,6 +1,6 @@
 //! Keyboard event handling
 
-use crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyCode;
 
 use super::app::{App, AppMode, DialogType, Panel};
 

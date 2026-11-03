@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Borders, BorderType, List, ListItem},
     Frame,
 };
-use totp_rs::{Algorithm, TOTP};
+use totp_rs::{Algorithm, Builder, Totp};
 
 use super::app::{App, Panel};
 
@@ -19,21 +19,19 @@ pub fn generate_totp(secret: &str) -> Option<(String, u64)> {
 
     // Try to parse as otpauth:// URL first, then as raw base32 secret
     let totp = if secret.starts_with("otpauth://") {
-        TOTP::from_url(secret).ok()?
+        Totp::from_url(secret).ok()?
     } else {
         // Assume raw base32 secret - decode it properly
         let secret_clean = secret.replace(' ', "").to_uppercase();
         let decoded = base32::decode(Alphabet::Rfc4648 { padding: false }, &secret_clean)?;
         // Use new_unchecked to allow secrets shorter than 128 bits (many authenticators use 80-bit secrets)
-        TOTP::new_unchecked(
-            Algorithm::SHA1,
-            6,
-            1,
-            30,
-            decoded,
-            None,
-            "".to_string(),
-        )
+        Builder::new()
+            .with_algorithm(Algorithm::SHA1)
+            .with_digits(6)
+            .with_skew(1)
+            .with_step_duration(30)
+            .with_secret(decoded)
+            .build_noncompliant()
     };
 
     let now = SystemTime::now()
@@ -41,7 +39,7 @@ pub fn generate_totp(secret: &str) -> Option<(String, u64)> {
         .ok()?
         .as_secs();
 
-    let code = totp.generate(now);
+    let code = totp.generate(now).to_string();
     let seconds_remaining = 30 - (now % 30);
 
     Some((code, seconds_remaining))
