@@ -777,3 +777,167 @@ fn unlock_notice(wallet: &Wallet) -> Option<String> {
         Some(parts.join("; "))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn typed(s: &str) -> Zeroizing<String> {
+        let mut buf = secret_buffer();
+        buf.push_str(s);
+        buf
+    }
+
+    fn created_app(dir: &Path) -> App {
+        let mut app = App::new(Some(dir));
+        app.password_input = typed("pass1234");
+        app.password_confirm = typed("pass1234");
+        assert!(app.try_create_wallet());
+        app
+    }
+
+    #[test]
+    fn mode_depends_on_whether_the_wallet_exists() {
+        let tmp = TempDir::new().unwrap();
+        assert_eq!(App::new(Some(tmp.path())).mode, AppMode::CreateWallet);
+        Wallet::create(tmp.path(), "pass1234", "en")
+            .unwrap()
+            .close();
+        assert_eq!(App::new(Some(tmp.path())).mode, AppMode::Password);
+    }
+
+    #[test]
+    fn create_wallet_validates_the_passwords() {
+        let tmp = TempDir::new().unwrap();
+        let mut app = App::new(Some(tmp.path()));
+        app.password_input = typed("pass1234");
+        app.password_confirm = typed("pass9999");
+        assert!(!app.try_create_wallet());
+        assert_eq!(
+            app.password_error.as_deref(),
+            Some("Passwords do not match")
+        );
+
+        app.password_input = typed("abc");
+        app.password_confirm = typed("abc");
+        assert!(!app.try_create_wallet());
+        assert_eq!(
+            app.password_error.as_deref(),
+            Some("Password must be at least 4 characters")
+        );
+        assert!(!tmp.path().join(iwcore::DATABASE_FILENAME).exists());
+    }
+
+    #[test]
+    fn create_wallet_wipes_the_typed_passwords() {
+        let tmp = TempDir::new().unwrap();
+        let app = created_app(tmp.path());
+        assert_eq!(app.mode, AppMode::Browse);
+        assert!(app.password_input.is_empty());
+        assert!(app.password_confirm.is_empty());
+        assert_eq!(app.message.as_deref(), Some("Wallet created successfully"));
+    }
+
+    #[test]
+    fn unlock_with_wrong_then_right_password() {
+        let tmp = TempDir::new().unwrap();
+        Wallet::create(tmp.path(), "pass1234", "en")
+            .unwrap()
+            .close();
+        let mut app = App::new(Some(tmp.path()));
+
+        app.password_input = typed("nope");
+        assert!(!app.try_unlock());
+        assert_eq!(app.password_error.as_deref(), Some("Invalid password"));
+        assert!(app.password_input.is_empty());
+
+        app.password_input = typed("pass1234");
+        assert!(app.try_unlock());
+        assert_eq!(app.mode, AppMode::Browse);
+        assert!(app.password_input.is_empty());
+        // A fresh v6 vault: nothing to report.
+        assert_eq!(app.message, None);
+    }
+
+    #[test]
+    fn unlock_reports_a_leftover_pre_v6_snapshot() {
+        let tmp = TempDir::new().unwrap();
+        Wallet::create(tmp.path(), "pass1234", "en")
+            .unwrap()
+            .close();
+        std::fs::write(
+            tmp.path()
+                .join(iwcore::business::wallet::PRE_V6_BACKUP_FILENAME),
+            b"old",
+        )
+        .unwrap();
+        let mut app = App::new(Some(tmp.path()));
+        app.password_input = typed("pass1234");
+        assert!(app.try_unlock());
+        let message = app.message.unwrap();
+        assert!(message.contains("nswallet.pre-v6.bak"), "{message}");
+    }
+
+    #[test]
+    fn change_password_checks_and_wipes() {
+        let tmp = TempDir::new().unwrap();
+        let mut app = created_app(tmp.path());
+
+        app.open_change_password_dialog();
+        app.old_password = typed("wrong");
+        app.new_password = typed("newpass1");
+        app.new_password_confirm = typed("newpass1");
+        assert!(!app.try_change_password());
+        assert_eq!(
+            app.password_error.as_deref(),
+            Some("Current password is incorrect")
+        );
+
+        app.old_password = typed("pass1234");
+        app.new_password_confirm = typed("different");
+        assert!(!app.try_change_password());
+        assert_eq!(
+            app.password_error.as_deref(),
+            Some("New passwords do not match")
+        );
+
+        app.new_password_confirm = typed("newpass1");
+        assert!(app.try_change_password());
+        assert_eq!(app.mode, AppMode::Browse);
+        assert!(app.old_password.is_empty());
+        assert!(app.new_password.is_empty());
+        assert!(app.new_password_confirm.is_empty());
+
+        let wallet = app.wallet.as_ref().unwrap();
+        assert!(wallet.check_password("newpass1").unwrap());
+        assert!(!wallet.check_password("pass1234").unwrap());
+    }
+
+    #[test]
+    fn closing_a_dialog_wipes_the_input_buffer() {
+        let tmp = TempDir::new().unwrap();
+        let mut app = created_app(tmp.path());
+        app.input_buffer.push_str("field secret");
+        app.close_dialog();
+        assert!(app.input_buffer.is_empty());
+    }
+
+    #[test]
+    fn items_and_fields_round_trip_through_the_app() {
+        let tmp = TempDir::new().unwrap();
+        let mut app = created_app(tmp.path());
+
+        app.open_new_item_dialog(false);
+        app.input_buffer.push_str("Bank");
+        app.create_item();
+        assert_eq!(app.selected_item.as_ref().unwrap().name, "Bank");
+
+        app.open_new_field_dialog();
+        app.input_buffer.push_str("hunter2");
+        app.create_field();
+        assert!(app.input_buffer.is_empty());
+        assert_eq!(app.fields.len(), 1);
+        assert_eq!(app.fields[0].value, "hunter2");
+    }
+}
