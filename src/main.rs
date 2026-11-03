@@ -89,7 +89,7 @@ fn main() {
     match &mut cli.command {
         Some(Commands::Version) => {
             println!("iwcli version {}", env!("CARGO_PKG_VERSION"));
-            println!("iwcore version {}", iwcore::DB_VERSION);
+            println!("wallet database format {}", iwcore::DB_VERSION);
         }
         Some(Commands::Backup { backup_folder }) => {
             let wallet = require_wallet(cli.wallet.as_deref(), "backup");
