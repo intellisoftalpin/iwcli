@@ -2,6 +2,11 @@
 
 ## 0.1.3
 
+### Added
+
+- Prebuilt binaries for Linux (x86_64, ARM64), macOS (Apple Silicon, Intel)
+  and Windows (x86_64) on every GitHub Release, with SHA-256 checksums.
+
 ### Changed
 
 - iwcore 0.6.0. Old (pre-v6) vaults are upgraded once to the Argon2id +
