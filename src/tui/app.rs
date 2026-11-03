@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use iwcore::{IWField, IWItem, IWLabel, Wallet, ROOT_ID};
+use iwcore::{IWField, IWItem, IWLabel, ROOT_ID, Wallet};
 use zeroize::{Zeroize, Zeroizing};
 
 /// An empty buffer for a typed password. It is wiped on drop, and the
@@ -558,7 +558,11 @@ impl App {
                 Ok(_) => {
                     self.message = Some(format!(
                         "Created {}",
-                        if self.creating_folder { "folder" } else { "item" }
+                        if self.creating_folder {
+                            "folder"
+                        } else {
+                            "item"
+                        }
                     ));
                     self.load_folder_items();
                     // Find and select the newly created item
@@ -587,7 +591,10 @@ impl App {
     /// Create a new field
     pub fn create_field(&mut self) {
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
-        let field_type = self.labels.get(self.dialog_selected).map(|l| l.field_type.clone());
+        let field_type = self
+            .labels
+            .get(self.dialog_selected)
+            .map(|l| l.field_type.clone());
         let value = Zeroizing::new(self.input_buffer.trim().to_string());
 
         if let (Some(item_id), Some(field_type)) = (item_id, field_type) {
@@ -628,7 +635,10 @@ impl App {
     /// Delete selected field
     pub fn delete_selected_field(&mut self) {
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
-        let field_id = self.fields.get(self.right_selected).map(|f| f.field_id.clone());
+        let field_id = self
+            .fields
+            .get(self.right_selected)
+            .map(|f| f.field_id.clone());
 
         if let (Some(item_id), Some(field_id)) = (item_id, field_id) {
             if let Some(wallet) = &mut self.wallet {
@@ -714,7 +724,10 @@ impl App {
     pub fn update_field(&mut self) {
         let new_value = Zeroizing::new(self.input_buffer.trim().to_string());
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
-        let field_id = self.fields.get(self.right_selected).map(|f| f.field_id.clone());
+        let field_id = self
+            .fields
+            .get(self.right_selected)
+            .map(|f| f.field_id.clone());
 
         if let (Some(item_id), Some(field_id)) = (item_id, field_id) {
             if let Some(wallet) = &mut self.wallet {
@@ -733,7 +746,6 @@ impl App {
         self.mode = AppMode::Browse;
     }
 }
-
 
 /// Message shown after a successful unlock when iwcore did more than unlock:
 /// the one-time upgrade of an old (pre-v6) vault, records it could not

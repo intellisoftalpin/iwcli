@@ -14,7 +14,7 @@ use std::path::Path;
 use ratatui::crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::prelude::*;
 
@@ -48,12 +48,18 @@ pub fn run(wallet_path: Option<&str>) -> io::Result<()> {
 }
 
 /// Main application loop
-fn run_app<B: Backend<Error = io::Error>>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
+fn run_app<B: Backend<Error = io::Error>>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+) -> io::Result<()> {
     let mut mouse_captured = true;
 
     loop {
         // Toggle mouse capture based on dialog state
-        let in_field_details = matches!(&app.mode, app::AppMode::Dialog(app::DialogType::FieldDetails));
+        let in_field_details = matches!(
+            &app.mode,
+            app::AppMode::Dialog(app::DialogType::FieldDetails)
+        );
 
         if in_field_details && mouse_captured {
             // Disable mouse capture to allow text selection in field details
@@ -97,7 +103,10 @@ pub fn show_about() -> io::Result<()> {
 
         let text = vec![
             Line::from(""),
-            Line::from(format!("  IntelliWallet CLI v{}", env!("CARGO_PKG_VERSION"))),
+            Line::from(format!(
+                "  IntelliWallet CLI v{}",
+                env!("CARGO_PKG_VERSION")
+            )),
             Line::from("  Password Manager for Terminal"),
             Line::from(""),
             Line::from("  Usage:"),

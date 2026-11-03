@@ -1,11 +1,11 @@
 //! Panel widgets for left (folders/items) and right (fields) panels
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, BorderType, List, ListItem},
-    Frame,
+    widgets::{Block, BorderType, Borders, List, ListItem},
 };
 
 use super::app::{App, Panel};
@@ -68,17 +68,20 @@ pub fn draw_left_panel(frame: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(Color::White)
         };
 
-        items.push(ListItem::new(Line::from(Span::styled(item.name.clone(), style))));
+        items.push(ListItem::new(Line::from(Span::styled(
+            item.name.clone(),
+            style,
+        ))));
     }
 
     // If empty, show hint
     if items.is_empty() {
-        items.push(ListItem::new(
-            Line::from(Span::styled(
-                "(empty)",
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
-            ))
-        ));
+        items.push(ListItem::new(Line::from(Span::styled(
+            "(empty)",
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+        ))));
     }
 
     // Calculate scroll offset to keep selected item visible
@@ -178,7 +181,9 @@ pub fn draw_right_panel(frame: &mut Frame, app: &App, area: Rect) {
             if app.fields.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "(no fields)",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::ITALIC),
                 ))));
                 items.push(ListItem::new(Line::from(Span::styled(
                     "Press F3 to add field",
@@ -190,7 +195,9 @@ pub fn draw_right_panel(frame: &mut Frame, app: &App, area: Rect) {
         // No item selected
         items.push(ListItem::new(Line::from(Span::styled(
             "Select an item",
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
         ))));
     }
 

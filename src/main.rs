@@ -102,7 +102,11 @@ fn main() {
             // Keep the password only in a buffer that is wiped on drop.
             let password = password.take().map(Zeroizing::new);
             let wallet = require_wallet(cli.wallet.as_deref(), "restore");
-            match commands::restore(wallet, Path::new(backup), password.as_deref().map(|p| p.as_str())) {
+            match commands::restore(
+                wallet,
+                Path::new(backup),
+                password.as_deref().map(|p| p.as_str()),
+            ) {
                 Ok(outcome) => {
                     println!("Restored to {}", outcome.db_path.display());
                     if outcome.needs_upgrade() {
@@ -114,14 +118,16 @@ fn main() {
                 Err(e) => fail(&e),
             }
         }
-        Some(Commands::Backups { backup_folder }) => match commands::backups(Path::new(backup_folder)) {
-            Ok(lines) => {
-                for line in lines {
-                    println!("{}", line);
+        Some(Commands::Backups { backup_folder }) => {
+            match commands::backups(Path::new(backup_folder)) {
+                Ok(lines) => {
+                    for line in lines {
+                        println!("{}", line);
+                    }
                 }
+                Err(e) => fail(&e),
             }
-            Err(e) => fail(&e),
-        },
+        }
         Some(_) => {
             println!("Command not yet implemented");
         }
