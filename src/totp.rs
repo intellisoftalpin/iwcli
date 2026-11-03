@@ -18,11 +18,17 @@ pub fn generate_totp(secret: &str) -> Option<(String, u64)> {
 /// Generate the TOTP code for the Unix time `now`. Returns (code, seconds_remaining).
 ///
 /// `secret` is either an `otpauth://` URL or a raw base32 secret (spaces and
-/// lower case allowed). Raw secrets shorter than 128 bits are accepted: many
-/// services still hand out 80-bit secrets.
+/// lower case allowed). Secrets shorter than 128 bits are accepted in both
+/// forms: many services still hand out 80-bit secrets.
 pub fn generate_totp_at(secret: &str, now: u64) -> Option<(String, u64)> {
     let totp = if secret.starts_with("otpauth://") {
-        Totp::from_url(secret).ok()?
+        // Unchecked like raw secrets below: otpauth URLs often carry 80-bit secrets.
+        let totp = Totp::from_url_unchecked(secret).ok()?;
+        // Values the generator cannot handle (it would divide by zero or overflow).
+        if totp.step() == 0 || !(6..=8).contains(&totp.digits()) {
+            return None;
+        }
+        totp
     } else {
         let secret_clean = Zeroizing::new(secret.replace(' ', "").to_uppercase());
         let decoded = base32::decode(Alphabet::Rfc4648 { padding: false }, &secret_clean)?;
