@@ -11,10 +11,10 @@ mod ui;
 use std::io;
 use std::path::Path;
 
-use crossterm::{
+use ratatui::crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::prelude::*;
 
@@ -48,12 +48,18 @@ pub fn run(wallet_path: Option<&str>) -> io::Result<()> {
 }
 
 /// Main application loop
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
+fn run_app<B: Backend<Error = io::Error>>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+) -> io::Result<()> {
     let mut mouse_captured = true;
 
     loop {
         // Toggle mouse capture based on dialog state
-        let in_field_details = matches!(&app.mode, app::AppMode::Dialog(app::DialogType::FieldDetails));
+        let in_field_details = matches!(
+            &app.mode,
+            app::AppMode::Dialog(app::DialogType::FieldDetails)
+        );
 
         if in_field_details && mouse_captured {
             // Disable mouse capture to allow text selection in field details
@@ -67,12 +73,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
 
         terminal.draw(|f| ui::draw(f, app))?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                if events::handle_key(app, key.code) {
-                    return Ok(());
-                }
-            }
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+            && events::handle_key(app, key.code)
+        {
+            return Ok(());
         }
     }
 }
@@ -97,7 +102,10 @@ pub fn show_about() -> io::Result<()> {
 
         let text = vec![
             Line::from(""),
-            Line::from(format!("  IntelliWallet CLI v{}", env!("CARGO_PKG_VERSION"))),
+            Line::from(format!(
+                "  IntelliWallet CLI v{}",
+                env!("CARGO_PKG_VERSION")
+            )),
             Line::from("  Password Manager for Terminal"),
             Line::from(""),
             Line::from("  Usage:"),
@@ -115,10 +123,10 @@ pub fn show_about() -> io::Result<()> {
 
     // Wait for any key
     loop {
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                break;
-            }
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            break;
         }
     }
 

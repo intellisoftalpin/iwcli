@@ -1,11 +1,11 @@
 //! UI layout and rendering
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, BorderType, Clear, Paragraph},
-    Frame,
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
 use super::app::{App, AppMode};
@@ -36,7 +36,12 @@ fn draw_password_screen(frame: &mut Frame, app: &App) {
     let dialog_height = 10;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     // Clear background
     frame.render_widget(Clear, dialog_area);
@@ -70,25 +75,22 @@ fn draw_password_screen(frame: &mut Frame, app: &App) {
         .as_ref()
         .map(|p| p.display().to_string())
         .unwrap_or_default();
-    let path_text = Paragraph::new(format!("Wallet: {}", path))
-        .style(Style::default().fg(Color::Gray));
+    let path_text =
+        Paragraph::new(format!("Wallet: {}", path)).style(Style::default().fg(Color::Gray));
     frame.render_widget(path_text, chunks[0]);
 
     // Password label
-    let label = Paragraph::new("Password:")
-        .style(Style::default().fg(Color::White));
+    let label = Paragraph::new("Password:").style(Style::default().fg(Color::White));
     frame.render_widget(label, chunks[2]);
 
     // Password input (masked)
     let masked: String = "*".repeat(app.password_input.len());
-    let input = Paragraph::new(format!("[{}]", masked))
-        .style(Style::default().fg(Color::Yellow));
+    let input = Paragraph::new(format!("[{}]", masked)).style(Style::default().fg(Color::Yellow));
     frame.render_widget(input, chunks[3]);
 
     // Error message or hint
     if let Some(error) = &app.password_error {
-        let error_text = Paragraph::new(error.as_str())
-            .style(Style::default().fg(Color::Red));
+        let error_text = Paragraph::new(error.as_str()).style(Style::default().fg(Color::Red));
         frame.render_widget(error_text, chunks[5]);
     } else {
         let hint = Paragraph::new("Enter: unlock | Esc/Q: quit")
@@ -106,7 +108,12 @@ fn draw_create_wallet_screen(frame: &mut Frame, app: &App) {
     let dialog_height = 14;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     // Clear background
     frame.render_widget(Clear, dialog_area);
@@ -143,8 +150,8 @@ fn draw_create_wallet_screen(frame: &mut Frame, app: &App) {
         .as_ref()
         .map(|p| p.display().to_string())
         .unwrap_or_default();
-    let path_text = Paragraph::new(format!("Location: {}", path))
-        .style(Style::default().fg(Color::Gray));
+    let path_text =
+        Paragraph::new(format!("Location: {}", path)).style(Style::default().fg(Color::Gray));
     frame.render_widget(path_text, chunks[0]);
 
     // Info message
@@ -192,8 +199,7 @@ fn draw_create_wallet_screen(frame: &mut Frame, app: &App) {
 
     // Error message or hint
     if let Some(error) = &app.password_error {
-        let error_text = Paragraph::new(error.as_str())
-            .style(Style::default().fg(Color::Red));
+        let error_text = Paragraph::new(error.as_str()).style(Style::default().fg(Color::Red));
         frame.render_widget(error_text, chunks[8]);
     } else {
         let hint = Paragraph::new("Tab: switch | Enter: create | Esc/Q: quit")
@@ -250,7 +256,8 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     // Show selected item's icon on the right
-    let icon = app.selected_item
+    let icon = app
+        .selected_item
         .as_ref()
         .map(|item| format!("[{}]", item.icon))
         .unwrap_or_default();
@@ -294,7 +301,6 @@ fn draw_toolbar(frame: &mut Frame, app: &App, area: Rect) {
         Span::raw(":Quit "),
     ];
 
-    let toolbar = Paragraph::new(Line::from(spans))
-        .style(Style::default().bg(Color::DarkGray));
+    let toolbar = Paragraph::new(Line::from(spans)).style(Style::default().bg(Color::DarkGray));
     frame.render_widget(toolbar, area);
 }

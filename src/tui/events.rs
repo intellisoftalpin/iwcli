@@ -1,6 +1,6 @@
 //! Keyboard event handling
 
-use crossterm::event::KeyCode;
+use ratatui::crossterm::event::KeyCode;
 
 use super::app::{App, AppMode, DialogType, Panel};
 
@@ -224,9 +224,15 @@ fn handle_dialog_key(app: &mut App, key: KeyCode, dialog_type: DialogType) -> bo
         KeyCode::Backspace => {
             if matches!(dialog_type, DialogType::ChangePassword) {
                 match app.change_password_focus {
-                    0 => { app.old_password.pop(); }
-                    1 => { app.new_password.pop(); }
-                    2 => { app.new_password_confirm.pop(); }
+                    0 => {
+                        app.old_password.pop();
+                    }
+                    1 => {
+                        app.new_password.pop();
+                    }
+                    2 => {
+                        app.new_password_confirm.pop();
+                    }
                     _ => {}
                 }
             } else {
@@ -237,9 +243,15 @@ fn handle_dialog_key(app: &mut App, key: KeyCode, dialog_type: DialogType) -> bo
         KeyCode::Char(c) => {
             if matches!(dialog_type, DialogType::ChangePassword) {
                 match app.change_password_focus {
-                    0 => { app.old_password.push(c); }
-                    1 => { app.new_password.push(c); }
-                    2 => { app.new_password_confirm.push(c); }
+                    0 => {
+                        app.old_password.push(c);
+                    }
+                    1 => {
+                        app.new_password.push(c);
+                    }
+                    2 => {
+                        app.new_password_confirm.push(c);
+                    }
                     _ => {}
                 }
             } else {
@@ -252,10 +264,10 @@ fn handle_dialog_key(app: &mut App, key: KeyCode, dialog_type: DialogType) -> bo
                 if app.dialog_selected > 0 {
                     app.dialog_selected -= 1;
                 }
-            } else if matches!(dialog_type, DialogType::ChangePassword) {
-                if app.change_password_focus > 0 {
-                    app.change_password_focus -= 1;
-                }
+            } else if matches!(dialog_type, DialogType::ChangePassword)
+                && app.change_password_focus > 0
+            {
+                app.change_password_focus -= 1;
             }
             false
         }

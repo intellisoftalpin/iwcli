@@ -2,7 +2,14 @@
 
 use std::path::{Path, PathBuf};
 
-use iwcore::{IWField, IWItem, IWLabel, Wallet, ROOT_ID};
+use iwcore::{IWField, IWItem, IWLabel, ROOT_ID, Wallet};
+use zeroize::{Zeroize, Zeroizing};
+
+/// An empty buffer for a typed password. It is wiped on drop, and the
+/// capacity is reserved up front so typing does not leave reallocated copies.
+fn secret_buffer() -> Zeroizing<String> {
+    Zeroizing::new(String::with_capacity(128))
+}
 
 /// Application mode
 #[derive(Debug, Clone, PartialEq)]
@@ -88,16 +95,16 @@ pub struct App {
     pub error: Option<String>,
 
     // Password entry
-    pub password_input: String,
-    pub password_confirm: String,
+    pub password_input: Zeroizing<String>,
+    pub password_confirm: Zeroizing<String>,
     pub password_error: Option<String>,
     /// Which field is focused in create wallet screen (0 = password, 1 = confirm)
     pub create_wallet_focus: usize,
 
     // Change password dialog
-    pub old_password: String,
-    pub new_password: String,
-    pub new_password_confirm: String,
+    pub old_password: Zeroizing<String>,
+    pub new_password: Zeroizing<String>,
+    pub new_password_confirm: Zeroizing<String>,
     /// Which field is focused (0 = old, 1 = new, 2 = confirm)
     pub change_password_focus: usize,
 }
@@ -142,23 +149,21 @@ impl App {
             message: None,
             error: None,
 
-            password_input: String::new(),
-            password_confirm: String::new(),
+            password_input: secret_buffer(),
+            password_confirm: secret_buffer(),
             password_error: None,
             create_wallet_focus: 0,
 
-            old_password: String::new(),
-            new_password: String::new(),
-            new_password_confirm: String::new(),
+            old_password: secret_buffer(),
+            new_password: secret_buffer(),
+            new_password_confirm: secret_buffer(),
             change_password_focus: 0,
         }
     }
 
     /// Open change password dialog
     pub fn open_change_password_dialog(&mut self) {
-        self.old_password.clear();
-        self.new_password.clear();
-        self.new_password_confirm.clear();
+        self.wipe_change_password_fields();
         self.change_password_focus = 0;
         self.password_error = None;
         self.mode = AppMode::Dialog(DialogType::ChangePassword);
@@ -202,6 +207,7 @@ impl App {
             match wallet.change_password(&self.new_password) {
                 Ok(_) => {
                     self.message = Some("Password changed successfully".to_string());
+                    self.wipe_change_password_fields();
                     self.close_dialog();
                     true
                 }
@@ -244,6 +250,7 @@ impl App {
                         self.labels = labels;
                     }
                     self.wallet = Some(wallet);
+                    self.wipe_entered_passwords();
                     self.mode = AppMode::Browse;
                     self.load_folder_items();
                     self.password_error = None;
@@ -271,7 +278,9 @@ impl App {
                             if let Ok(labels) = wallet.get_labels() {
                                 self.labels = labels;
                             }
+                            self.message = unlock_notice(&wallet);
                             self.wallet = Some(wallet);
+                            self.wipe_entered_passwords();
                             self.mode = AppMode::Browse;
                             self.load_folder_items();
                             self.password_error = None;
@@ -279,19 +288,19 @@ impl App {
                         }
                         Ok(false) => {
                             self.password_error = Some("Invalid password".to_string());
-                            self.password_input.clear();
+                            self.password_input.zeroize();
                             false
                         }
                         Err(e) => {
                             self.password_error = Some(format!("Error: {}", e));
-                            self.password_input.clear();
+                            self.password_input.zeroize();
                             false
                         }
                     }
                 }
                 Err(e) => {
                     self.password_error = Some(format!("Cannot open wallet: {}", e));
-                    self.password_input.clear();
+                    self.password_input.zeroize();
                     false
                 }
             }
@@ -369,18 +378,18 @@ impl App {
 
     /// Navigate into a folder
     pub fn enter_folder(&mut self) {
-        if let Some(item) = &self.selected_item {
-            if item.folder {
-                // Push current folder to stack
-                self.folder_stack.push((
-                    self.current_folder_id.clone(),
-                    self.current_folder_name.clone(),
-                ));
-                // Enter new folder
-                self.current_folder_id = item.item_id.clone();
-                self.current_folder_name = item.name.clone();
-                self.load_folder_items();
-            }
+        if let Some(item) = &self.selected_item
+            && item.folder
+        {
+            // Push current folder to stack
+            self.folder_stack.push((
+                self.current_folder_id.clone(),
+                self.current_folder_name.clone(),
+            ));
+            // Enter new folder
+            self.current_folder_id = item.item_id.clone();
+            self.current_folder_name = item.name.clone();
+            self.load_folder_items();
         }
     }
 
@@ -479,12 +488,12 @@ impl App {
                 if !self.is_root() && self.left_selected == 0 {
                     // Selected ".." - go back
                     self.go_back();
-                } else if let Some(item) = &self.selected_item {
-                    if item.folder {
-                        self.enter_folder();
-                    }
-                    // For regular items, fields are already shown
+                } else if let Some(item) = &self.selected_item
+                    && item.folder
+                {
+                    self.enter_folder();
                 }
+                // For regular items, fields are already shown
             }
             Panel::Right => {
                 // Show field details
@@ -549,7 +558,11 @@ impl App {
                 Ok(_) => {
                     self.message = Some(format!(
                         "Created {}",
-                        if self.creating_folder { "folder" } else { "item" }
+                        if self.creating_folder {
+                            "folder"
+                        } else {
+                            "item"
+                        }
                     ));
                     self.load_folder_items();
                     // Find and select the newly created item
@@ -578,8 +591,11 @@ impl App {
     /// Create a new field
     pub fn create_field(&mut self) {
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
-        let field_type = self.labels.get(self.dialog_selected).map(|l| l.field_type.clone());
-        let value = self.input_buffer.trim().to_string();
+        let field_type = self
+            .labels
+            .get(self.dialog_selected)
+            .map(|l| l.field_type.clone());
+        let value = Zeroizing::new(self.input_buffer.trim().to_string());
 
         if let (Some(item_id), Some(field_type)) = (item_id, field_type) {
             if let Some(wallet) = &mut self.wallet {
@@ -596,6 +612,7 @@ impl App {
         } else {
             self.error = Some("Invalid field type".to_string());
         }
+        self.input_buffer.zeroize();
         self.mode = AppMode::Browse;
     }
 
@@ -618,18 +635,21 @@ impl App {
     /// Delete selected field
     pub fn delete_selected_field(&mut self) {
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
-        let field_id = self.fields.get(self.right_selected).map(|f| f.field_id.clone());
+        let field_id = self
+            .fields
+            .get(self.right_selected)
+            .map(|f| f.field_id.clone());
 
-        if let (Some(item_id), Some(field_id)) = (item_id, field_id) {
-            if let Some(wallet) = &mut self.wallet {
-                match wallet.delete_field(&item_id, &field_id) {
-                    Ok(_) => {
-                        self.message = Some("Field deleted".to_string());
-                        self.load_fields(&item_id);
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to delete: {}", e));
-                    }
+        if let (Some(item_id), Some(field_id)) = (item_id, field_id)
+            && let Some(wallet) = &mut self.wallet
+        {
+            match wallet.delete_field(&item_id, &field_id) {
+                Ok(_) => {
+                    self.message = Some("Field deleted".to_string());
+                    self.load_fields(&item_id);
+                }
+                Err(e) => {
+                    self.error = Some(format!("Failed to delete: {}", e));
                 }
             }
         }
@@ -639,8 +659,22 @@ impl App {
     /// Close dialog
     pub fn close_dialog(&mut self) {
         self.mode = AppMode::Browse;
-        self.input_buffer.clear();
+        // The buffer may hold a field value (a password) being edited.
+        self.input_buffer.zeroize();
         self.input_secondary.clear();
+    }
+
+    /// Wipe the passwords typed on the unlock / create wallet screen.
+    fn wipe_entered_passwords(&mut self) {
+        self.password_input.zeroize();
+        self.password_confirm.zeroize();
+    }
+
+    /// Wipe the passwords typed in the change password dialog.
+    pub fn wipe_change_password_fields(&mut self) {
+        self.old_password.zeroize();
+        self.new_password.zeroize();
+        self.new_password_confirm.zeroize();
     }
 
     /// Open edit item dialog
@@ -669,17 +703,17 @@ impl App {
         }
 
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
-        if let Some(item_id) = item_id {
-            if let Some(wallet) = &mut self.wallet {
-                match wallet.update_item_name(&item_id, &new_name) {
-                    Ok(_) => {
-                        self.message = Some("Item updated".to_string());
-                        self.load_folder_items();
-                        self.select_item_by_name(&new_name);
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to update: {}", e));
-                    }
+        if let Some(item_id) = item_id
+            && let Some(wallet) = &mut self.wallet
+        {
+            match wallet.update_item_name(&item_id, &new_name) {
+                Ok(_) => {
+                    self.message = Some("Item updated".to_string());
+                    self.load_folder_items();
+                    self.select_item_by_name(&new_name);
+                }
+                Err(e) => {
+                    self.error = Some(format!("Failed to update: {}", e));
                 }
             }
         }
@@ -688,23 +722,222 @@ impl App {
 
     /// Update field value
     pub fn update_field(&mut self) {
-        let new_value = self.input_buffer.trim().to_string();
+        let new_value = Zeroizing::new(self.input_buffer.trim().to_string());
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
-        let field_id = self.fields.get(self.right_selected).map(|f| f.field_id.clone());
+        let field_id = self
+            .fields
+            .get(self.right_selected)
+            .map(|f| f.field_id.clone());
 
-        if let (Some(item_id), Some(field_id)) = (item_id, field_id) {
-            if let Some(wallet) = &mut self.wallet {
-                match wallet.update_field(&field_id, &new_value, None) {
-                    Ok(_) => {
-                        self.message = Some("Field updated".to_string());
-                        self.load_fields(&item_id);
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to update: {}", e));
-                    }
+        if let (Some(item_id), Some(field_id)) = (item_id, field_id)
+            && let Some(wallet) = &mut self.wallet
+        {
+            match wallet.update_field(&field_id, &new_value, None) {
+                Ok(_) => {
+                    self.message = Some("Field updated".to_string());
+                    self.load_fields(&item_id);
+                }
+                Err(e) => {
+                    self.error = Some(format!("Failed to update: {}", e));
                 }
             }
         }
+        self.input_buffer.zeroize();
         self.mode = AppMode::Browse;
+    }
+}
+
+/// Message shown after a successful unlock when iwcore did more than unlock:
+/// the one-time upgrade of an old (pre-v6) vault, records it could not
+/// decrypt, or an old-format snapshot still in the wallet folder.
+fn unlock_notice(wallet: &Wallet) -> Option<String> {
+    let mut parts = Vec::new();
+    if let Some(summary) = wallet.last_migration_summary() {
+        parts.push(format!(
+            "Vault upgraded to the current format ({} items, {} fields)",
+            summary.items_migrated, summary.fields_migrated
+        ));
+    }
+    match wallet.quarantine_count() {
+        Ok(0) | Err(_) => {}
+        Ok(n) => parts.push(format!(
+            "{} old records could not be decrypted and are kept aside",
+            n
+        )),
+    }
+    if wallet.has_pre_v6_snapshot() {
+        parts.push(format!(
+            "old-format copy {} is still in the wallet folder; delete it once you have a current backup",
+            iwcore::business::wallet::PRE_V6_BACKUP_FILENAME
+        ));
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("; "))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn typed(s: &str) -> Zeroizing<String> {
+        let mut buf = secret_buffer();
+        buf.push_str(s);
+        buf
+    }
+
+    fn created_app(dir: &Path) -> App {
+        let mut app = App::new(Some(dir));
+        app.password_input = typed("pass1234");
+        app.password_confirm = typed("pass1234");
+        assert!(app.try_create_wallet());
+        app
+    }
+
+    #[test]
+    fn mode_depends_on_whether_the_wallet_exists() {
+        let tmp = TempDir::new().unwrap();
+        assert_eq!(App::new(Some(tmp.path())).mode, AppMode::CreateWallet);
+        Wallet::create(tmp.path(), "pass1234", "en")
+            .unwrap()
+            .close();
+        assert_eq!(App::new(Some(tmp.path())).mode, AppMode::Password);
+    }
+
+    #[test]
+    fn create_wallet_validates_the_passwords() {
+        let tmp = TempDir::new().unwrap();
+        let mut app = App::new(Some(tmp.path()));
+        app.password_input = typed("pass1234");
+        app.password_confirm = typed("pass9999");
+        assert!(!app.try_create_wallet());
+        assert_eq!(
+            app.password_error.as_deref(),
+            Some("Passwords do not match")
+        );
+
+        app.password_input = typed("abc");
+        app.password_confirm = typed("abc");
+        assert!(!app.try_create_wallet());
+        assert_eq!(
+            app.password_error.as_deref(),
+            Some("Password must be at least 4 characters")
+        );
+        assert!(!tmp.path().join(iwcore::DATABASE_FILENAME).exists());
+    }
+
+    #[test]
+    fn create_wallet_wipes_the_typed_passwords() {
+        let tmp = TempDir::new().unwrap();
+        let app = created_app(tmp.path());
+        assert_eq!(app.mode, AppMode::Browse);
+        assert!(app.password_input.is_empty());
+        assert!(app.password_confirm.is_empty());
+        assert_eq!(app.message.as_deref(), Some("Wallet created successfully"));
+    }
+
+    #[test]
+    fn unlock_with_wrong_then_right_password() {
+        let tmp = TempDir::new().unwrap();
+        Wallet::create(tmp.path(), "pass1234", "en")
+            .unwrap()
+            .close();
+        let mut app = App::new(Some(tmp.path()));
+
+        app.password_input = typed("nope");
+        assert!(!app.try_unlock());
+        assert_eq!(app.password_error.as_deref(), Some("Invalid password"));
+        assert!(app.password_input.is_empty());
+
+        app.password_input = typed("pass1234");
+        assert!(app.try_unlock());
+        assert_eq!(app.mode, AppMode::Browse);
+        assert!(app.password_input.is_empty());
+        // A fresh v6 vault: nothing to report.
+        assert_eq!(app.message, None);
+    }
+
+    #[test]
+    fn unlock_reports_a_leftover_pre_v6_snapshot() {
+        let tmp = TempDir::new().unwrap();
+        Wallet::create(tmp.path(), "pass1234", "en")
+            .unwrap()
+            .close();
+        std::fs::write(
+            tmp.path()
+                .join(iwcore::business::wallet::PRE_V6_BACKUP_FILENAME),
+            b"old",
+        )
+        .unwrap();
+        let mut app = App::new(Some(tmp.path()));
+        app.password_input = typed("pass1234");
+        assert!(app.try_unlock());
+        let message = app.message.unwrap();
+        assert!(message.contains("nswallet.pre-v6.bak"), "{message}");
+    }
+
+    #[test]
+    fn change_password_checks_and_wipes() {
+        let tmp = TempDir::new().unwrap();
+        let mut app = created_app(tmp.path());
+
+        app.open_change_password_dialog();
+        app.old_password = typed("wrong");
+        app.new_password = typed("newpass1");
+        app.new_password_confirm = typed("newpass1");
+        assert!(!app.try_change_password());
+        assert_eq!(
+            app.password_error.as_deref(),
+            Some("Current password is incorrect")
+        );
+
+        app.old_password = typed("pass1234");
+        app.new_password_confirm = typed("different");
+        assert!(!app.try_change_password());
+        assert_eq!(
+            app.password_error.as_deref(),
+            Some("New passwords do not match")
+        );
+
+        app.new_password_confirm = typed("newpass1");
+        assert!(app.try_change_password());
+        assert_eq!(app.mode, AppMode::Browse);
+        assert!(app.old_password.is_empty());
+        assert!(app.new_password.is_empty());
+        assert!(app.new_password_confirm.is_empty());
+
+        let wallet = app.wallet.as_ref().unwrap();
+        assert!(wallet.check_password("newpass1").unwrap());
+        assert!(!wallet.check_password("pass1234").unwrap());
+    }
+
+    #[test]
+    fn closing_a_dialog_wipes_the_input_buffer() {
+        let tmp = TempDir::new().unwrap();
+        let mut app = created_app(tmp.path());
+        app.input_buffer.push_str("field secret");
+        app.close_dialog();
+        assert!(app.input_buffer.is_empty());
+    }
+
+    #[test]
+    fn items_and_fields_round_trip_through_the_app() {
+        let tmp = TempDir::new().unwrap();
+        let mut app = created_app(tmp.path());
+
+        app.open_new_item_dialog(false);
+        app.input_buffer.push_str("Bank");
+        app.create_item();
+        assert_eq!(app.selected_item.as_ref().unwrap().name, "Bank");
+
+        app.open_new_field_dialog();
+        app.input_buffer.push_str("hunter2");
+        app.create_field();
+        assert!(app.input_buffer.is_empty());
+        assert_eq!(app.fields.len(), 1);
+        assert_eq!(app.fields[0].value, "hunter2");
     }
 }

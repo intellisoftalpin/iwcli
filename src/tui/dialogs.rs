@@ -1,15 +1,15 @@
 //! Modal dialog widgets
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, BorderType, Clear, List, ListItem, Paragraph},
-    Frame,
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph},
 };
 
 use super::app::{App, DialogType};
-use super::panels::generate_totp;
+use crate::totp::generate_totp;
 
 /// Draw a dialog based on type
 pub fn draw_dialog(frame: &mut Frame, app: &App, dialog_type: &DialogType) {
@@ -33,7 +33,12 @@ fn draw_new_item_dialog(frame: &mut Frame, app: &App) {
     let dialog_height = 10;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     frame.render_widget(Clear, dialog_area);
 
@@ -66,18 +71,16 @@ fn draw_new_item_dialog(frame: &mut Frame, app: &App) {
         .split(inner);
 
     // Name label
-    let label = Paragraph::new("Name:")
-        .style(Style::default().fg(Color::White));
+    let label = Paragraph::new("Name:").style(Style::default().fg(Color::White));
     frame.render_widget(label, chunks[0]);
 
     // Name input
-    let input = Paragraph::new(format!("[{}]", &app.input_buffer))
-        .style(Style::default().fg(Color::Yellow));
+    let input =
+        Paragraph::new(format!("[{}]", app.input_buffer)).style(Style::default().fg(Color::Yellow));
     frame.render_widget(input, chunks[1]);
 
     // Icon label
-    let icon_label = Paragraph::new("Icon:")
-        .style(Style::default().fg(Color::White));
+    let icon_label = Paragraph::new("Icon:").style(Style::default().fg(Color::White));
     frame.render_widget(icon_label, chunks[2]);
 
     // Icon input
@@ -86,13 +89,13 @@ fn draw_new_item_dialog(frame: &mut Frame, app: &App) {
     } else {
         &app.input_secondary
     };
-    let icon_input = Paragraph::new(format!("[{}]", icon_hint))
-        .style(Style::default().fg(Color::DarkGray));
+    let icon_input =
+        Paragraph::new(format!("[{}]", icon_hint)).style(Style::default().fg(Color::DarkGray));
     frame.render_widget(icon_input, chunks[3]);
 
     // Hint
-    let hint = Paragraph::new("Enter: Create  |  Esc: Cancel")
-        .style(Style::default().fg(Color::DarkGray));
+    let hint =
+        Paragraph::new("Enter: Create  |  Esc: Cancel").style(Style::default().fg(Color::DarkGray));
     frame.render_widget(hint, chunks[5]);
 }
 
@@ -104,7 +107,12 @@ fn draw_new_field_dialog(frame: &mut Frame, app: &App) {
     let dialog_height = 16;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     frame.render_widget(Clear, dialog_area);
 
@@ -121,17 +129,17 @@ fn draw_new_field_dialog(frame: &mut Frame, app: &App) {
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Length(1),  // Type label
-            Constraint::Length(8),  // Type list
-            Constraint::Length(1),  // Value label
-            Constraint::Length(1),  // Value input
-            Constraint::Length(1),  // Hint
+            Constraint::Length(1), // Type label
+            Constraint::Length(8), // Type list
+            Constraint::Length(1), // Value label
+            Constraint::Length(1), // Value input
+            Constraint::Length(1), // Hint
         ])
         .split(inner);
 
     // Type label
-    let label = Paragraph::new("Field Type (Up/Down to select):")
-        .style(Style::default().fg(Color::White));
+    let label =
+        Paragraph::new("Field Type (Up/Down to select):").style(Style::default().fg(Color::White));
     frame.render_widget(label, chunks[0]);
 
     // Type list (show subset of labels)
@@ -162,18 +170,17 @@ fn draw_new_field_dialog(frame: &mut Frame, app: &App) {
     frame.render_widget(list, chunks[1]);
 
     // Value label
-    let value_label = Paragraph::new("Value:")
-        .style(Style::default().fg(Color::White));
+    let value_label = Paragraph::new("Value:").style(Style::default().fg(Color::White));
     frame.render_widget(value_label, chunks[2]);
 
     // Value input
-    let input = Paragraph::new(format!("[{}]", &app.input_buffer))
-        .style(Style::default().fg(Color::Yellow));
+    let input =
+        Paragraph::new(format!("[{}]", app.input_buffer)).style(Style::default().fg(Color::Yellow));
     frame.render_widget(input, chunks[3]);
 
     // Hint
-    let hint = Paragraph::new("Enter: Create  |  Esc: Cancel")
-        .style(Style::default().fg(Color::DarkGray));
+    let hint =
+        Paragraph::new("Enter: Create  |  Esc: Cancel").style(Style::default().fg(Color::DarkGray));
     frame.render_widget(hint, chunks[4]);
 }
 
@@ -185,7 +192,12 @@ fn draw_delete_item_dialog(frame: &mut Frame, app: &App) {
     let dialog_height = 8;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     frame.render_widget(Clear, dialog_area);
 
@@ -209,8 +221,7 @@ fn draw_delete_item_dialog(frame: &mut Frame, app: &App) {
         ])
         .split(inner);
 
-    let message = Paragraph::new("Delete this item?")
-        .style(Style::default().fg(Color::White));
+    let message = Paragraph::new("Delete this item?").style(Style::default().fg(Color::White));
     frame.render_widget(message, chunks[0]);
 
     let item_name = app
@@ -218,12 +229,15 @@ fn draw_delete_item_dialog(frame: &mut Frame, app: &App) {
         .as_ref()
         .map(|i| i.name.clone())
         .unwrap_or_default();
-    let name_text = Paragraph::new(item_name)
-        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+    let name_text = Paragraph::new(item_name).style(
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    );
     frame.render_widget(name_text, chunks[1]);
 
-    let hint = Paragraph::new("Enter: Delete  |  Esc: Cancel")
-        .style(Style::default().fg(Color::DarkGray));
+    let hint =
+        Paragraph::new("Enter: Delete  |  Esc: Cancel").style(Style::default().fg(Color::DarkGray));
     frame.render_widget(hint, chunks[3]);
 }
 
@@ -235,7 +249,12 @@ fn draw_delete_field_dialog(frame: &mut Frame, app: &App) {
     let dialog_height = 8;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     frame.render_widget(Clear, dialog_area);
 
@@ -259,8 +278,7 @@ fn draw_delete_field_dialog(frame: &mut Frame, app: &App) {
         ])
         .split(inner);
 
-    let message = Paragraph::new("Delete this field?")
-        .style(Style::default().fg(Color::White));
+    let message = Paragraph::new("Delete this field?").style(Style::default().fg(Color::White));
     frame.render_widget(message, chunks[0]);
 
     let field_info = if let Some(field) = app.fields.get(app.right_selected) {
@@ -268,12 +286,11 @@ fn draw_delete_field_dialog(frame: &mut Frame, app: &App) {
     } else {
         String::new()
     };
-    let field_text = Paragraph::new(field_info)
-        .style(Style::default().fg(Color::Yellow));
+    let field_text = Paragraph::new(field_info).style(Style::default().fg(Color::Yellow));
     frame.render_widget(field_text, chunks[1]);
 
-    let hint = Paragraph::new("Enter: Delete  |  Esc: Cancel")
-        .style(Style::default().fg(Color::DarkGray));
+    let hint =
+        Paragraph::new("Enter: Delete  |  Esc: Cancel").style(Style::default().fg(Color::DarkGray));
     frame.render_widget(hint, chunks[3]);
 }
 
@@ -285,11 +302,21 @@ fn draw_edit_item_dialog(frame: &mut Frame, app: &App) {
     let dialog_height = 8;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     frame.render_widget(Clear, dialog_area);
 
-    let title = if app.selected_item.as_ref().map(|i| i.folder).unwrap_or(false) {
+    let title = if app
+        .selected_item
+        .as_ref()
+        .map(|i| i.folder)
+        .unwrap_or(false)
+    {
         " Edit Folder "
     } else {
         " Edit Item "
@@ -316,18 +343,17 @@ fn draw_edit_item_dialog(frame: &mut Frame, app: &App) {
         .split(inner);
 
     // Name label
-    let label = Paragraph::new("Name:")
-        .style(Style::default().fg(Color::White));
+    let label = Paragraph::new("Name:").style(Style::default().fg(Color::White));
     frame.render_widget(label, chunks[0]);
 
     // Name input
-    let input = Paragraph::new(format!("[{}]", &app.input_buffer))
-        .style(Style::default().fg(Color::Yellow));
+    let input =
+        Paragraph::new(format!("[{}]", app.input_buffer)).style(Style::default().fg(Color::Yellow));
     frame.render_widget(input, chunks[1]);
 
     // Hint
-    let hint = Paragraph::new("Enter: Save  |  Esc: Cancel")
-        .style(Style::default().fg(Color::DarkGray));
+    let hint =
+        Paragraph::new("Enter: Save  |  Esc: Cancel").style(Style::default().fg(Color::DarkGray));
     frame.render_widget(hint, chunks[3]);
 }
 
@@ -339,7 +365,12 @@ fn draw_edit_field_dialog(frame: &mut Frame, app: &App) {
     let dialog_height = 10;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     frame.render_widget(Clear, dialog_area);
 
@@ -366,26 +397,26 @@ fn draw_edit_field_dialog(frame: &mut Frame, app: &App) {
         .split(inner);
 
     // Field info
-    let field_label = app.fields.get(app.right_selected)
+    let field_label = app
+        .fields
+        .get(app.right_selected)
         .map(|f| format!("[{}] {}", f.icon, f.label))
         .unwrap_or_default();
-    let info = Paragraph::new(field_label)
-        .style(Style::default().fg(Color::Cyan));
+    let info = Paragraph::new(field_label).style(Style::default().fg(Color::Cyan));
     frame.render_widget(info, chunks[0]);
 
     // Value label
-    let label = Paragraph::new("Value:")
-        .style(Style::default().fg(Color::White));
+    let label = Paragraph::new("Value:").style(Style::default().fg(Color::White));
     frame.render_widget(label, chunks[2]);
 
     // Value input
-    let input = Paragraph::new(format!("[{}]", &app.input_buffer))
-        .style(Style::default().fg(Color::Yellow));
+    let input =
+        Paragraph::new(format!("[{}]", app.input_buffer)).style(Style::default().fg(Color::Yellow));
     frame.render_widget(input, chunks[3]);
 
     // Hint
-    let hint = Paragraph::new("Enter: Save  |  Esc: Cancel")
-        .style(Style::default().fg(Color::DarkGray));
+    let hint =
+        Paragraph::new("Enter: Save  |  Esc: Cancel").style(Style::default().fg(Color::DarkGray));
     frame.render_widget(hint, chunks[5]);
 }
 
@@ -397,7 +428,12 @@ fn draw_field_details_dialog(frame: &mut Frame, app: &App) {
     let dialog_height = 14;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     frame.render_widget(Clear, dialog_area);
 
@@ -433,8 +469,9 @@ fn draw_field_details_dialog(frame: &mut Frame, app: &App) {
         frame.render_widget(label_text, chunks[0]);
 
         // Field type
-        let type_text = Paragraph::new(format!("Type: {} ({})", field.field_type, field.value_type))
-            .style(Style::default().fg(Color::White));
+        let type_text =
+            Paragraph::new(format!("Type: {} ({})", field.field_type, field.value_type))
+                .style(Style::default().fg(Color::White));
         frame.render_widget(type_text, chunks[1]);
 
         // Icon
@@ -453,16 +490,18 @@ fn draw_field_details_dialog(frame: &mut Frame, app: &App) {
             ("Value:", field.value.clone())
         };
 
-        let value_label = Paragraph::new(value_label_text)
-            .style(Style::default().fg(Color::DarkGray));
+        let value_label =
+            Paragraph::new(value_label_text).style(Style::default().fg(Color::DarkGray));
         frame.render_widget(value_label, chunks[4]);
 
-        let value_text = Paragraph::new(display_value)
-            .style(Style::default().fg(Color::Yellow));
+        let value_text = Paragraph::new(display_value).style(Style::default().fg(Color::Yellow));
         frame.render_widget(value_text, chunks[5]);
 
         // Changed timestamp
-        let changed = field.change_timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+        let changed = field
+            .change_timestamp
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
         let changed_text = Paragraph::new(format!("Changed: {}", changed))
             .style(Style::default().fg(Color::DarkGray));
         frame.render_widget(changed_text, chunks[7]);
@@ -482,7 +521,12 @@ fn draw_change_password_dialog(frame: &mut Frame, app: &App) {
     let dialog_height = 14;
     let x = (area.width.saturating_sub(dialog_width)) / 2;
     let y = (area.height.saturating_sub(dialog_height)) / 2;
-    let dialog_area = Rect::new(x, y, dialog_width.min(area.width), dialog_height.min(area.height));
+    let dialog_area = Rect::new(
+        x,
+        y,
+        dialog_width.min(area.width),
+        dialog_height.min(area.height),
+    );
 
     frame.render_widget(Clear, dialog_area);
 
@@ -553,8 +597,7 @@ fn draw_change_password_dialog(frame: &mut Frame, app: &App) {
 
     // Error or hint
     if let Some(error) = &app.password_error {
-        let error_text = Paragraph::new(error.as_str())
-            .style(Style::default().fg(Color::Red));
+        let error_text = Paragraph::new(error.as_str()).style(Style::default().fg(Color::Red));
         frame.render_widget(error_text, chunks[8]);
     } else {
         let hint = Paragraph::new("Tab/Up/Down: switch | Enter: change | Esc: cancel")

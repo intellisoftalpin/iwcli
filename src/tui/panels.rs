@@ -1,50 +1,24 @@
 //! Panel widgets for left (folders/items) and right (fields) panels
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, BorderType, List, ListItem},
-    Frame,
+    widgets::{Block, BorderType, Borders, List, ListItem},
 };
-use totp_rs::{Algorithm, TOTP};
 
 use super::app::{App, Panel};
 
-/// Generate TOTP code from a secret. Returns (code, seconds_remaining)
-pub fn generate_totp(secret: &str) -> Option<(String, u64)> {
-    use base32::Alphabet;
-
-    // Try to parse as otpauth:// URL first, then as raw base32 secret
-    let totp = if secret.starts_with("otpauth://") {
-        TOTP::from_url(secret).ok()?
+/// First list row to draw so that `selected` stays visible, roughly centred.
+pub fn scroll_offset(total_items: usize, visible_height: usize, selected: usize) -> usize {
+    if total_items <= visible_height || selected < visible_height / 2 {
+        0
+    } else if selected >= total_items.saturating_sub(visible_height / 2) {
+        total_items.saturating_sub(visible_height)
     } else {
-        // Assume raw base32 secret - decode it properly
-        let secret_clean = secret.replace(' ', "").to_uppercase();
-        let decoded = base32::decode(Alphabet::Rfc4648 { padding: false }, &secret_clean)?;
-        // Use new_unchecked to allow secrets shorter than 128 bits (many authenticators use 80-bit secrets)
-        TOTP::new_unchecked(
-            Algorithm::SHA1,
-            6,
-            1,
-            30,
-            decoded,
-            None,
-            "".to_string(),
-        )
-    };
-
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .ok()?
-        .as_secs();
-
-    let code = totp.generate(now);
-    let seconds_remaining = 30 - (now % 30);
-
-    Some((code, seconds_remaining))
+        selected.saturating_sub(visible_height / 2)
+    }
 }
 
 /// Draw the left panel (folder contents)
@@ -105,17 +79,20 @@ pub fn draw_left_panel(frame: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(Color::White)
         };
 
-        items.push(ListItem::new(Line::from(Span::styled(item.name.clone(), style))));
+        items.push(ListItem::new(Line::from(Span::styled(
+            item.name.clone(),
+            style,
+        ))));
     }
 
     // If empty, show hint
     if items.is_empty() {
-        items.push(ListItem::new(
-            Line::from(Span::styled(
-                "(empty)",
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
-            ))
-        ));
+        items.push(ListItem::new(Line::from(Span::styled(
+            "(empty)",
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+        ))));
     }
 
     // Calculate scroll offset to keep selected item visible
@@ -123,15 +100,7 @@ pub fn draw_left_panel(frame: &mut Frame, app: &App, area: Rect) {
     let total_items = items.len();
     let selected = app.left_selected;
 
-    let scroll_offset = if total_items <= visible_height {
-        0
-    } else if selected < visible_height / 2 {
-        0
-    } else if selected >= total_items.saturating_sub(visible_height / 2) {
-        total_items.saturating_sub(visible_height)
-    } else {
-        selected.saturating_sub(visible_height / 2)
-    };
+    let scroll_offset = scroll_offset(total_items, visible_height, selected);
 
     // Take only visible items
     let visible_items: Vec<ListItem> = items
@@ -215,7 +184,9 @@ pub fn draw_right_panel(frame: &mut Frame, app: &App, area: Rect) {
             if app.fields.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "(no fields)",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::ITALIC),
                 ))));
                 items.push(ListItem::new(Line::from(Span::styled(
                     "Press F3 to add field",
@@ -227,7 +198,9 @@ pub fn draw_right_panel(frame: &mut Frame, app: &App, area: Rect) {
         // No item selected
         items.push(ListItem::new(Line::from(Span::styled(
             "Select an item",
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
         ))));
     }
 
@@ -236,15 +209,7 @@ pub fn draw_right_panel(frame: &mut Frame, app: &App, area: Rect) {
     let total_items = items.len();
     let selected = app.right_selected;
 
-    let scroll_offset = if total_items <= visible_height {
-        0
-    } else if selected < visible_height / 2 {
-        0
-    } else if selected >= total_items.saturating_sub(visible_height / 2) {
-        total_items.saturating_sub(visible_height)
-    } else {
-        selected.saturating_sub(visible_height / 2)
-    };
+    let scroll_offset = scroll_offset(total_items, visible_height, selected);
 
     // Take only visible items
     let visible_items: Vec<ListItem> = items
@@ -255,4 +220,38 @@ pub fn draw_right_panel(frame: &mut Frame, app: &App, area: Rect) {
 
     let list = List::new(visible_items);
     frame.render_widget(list, inner);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::scroll_offset;
+
+    #[test]
+    fn no_scroll_when_everything_fits() {
+        assert_eq!(scroll_offset(5, 10, 4), 0);
+        assert_eq!(scroll_offset(10, 10, 9), 0);
+    }
+
+    #[test]
+    fn no_scroll_near_the_top() {
+        assert_eq!(scroll_offset(100, 10, 0), 0);
+        assert_eq!(scroll_offset(100, 10, 4), 0);
+    }
+
+    #[test]
+    fn selection_is_centred_in_the_middle() {
+        assert_eq!(scroll_offset(100, 10, 5), 0);
+        assert_eq!(scroll_offset(100, 10, 50), 45);
+    }
+
+    #[test]
+    fn last_page_is_pinned_at_the_end() {
+        assert_eq!(scroll_offset(100, 10, 95), 90);
+        assert_eq!(scroll_offset(100, 10, 99), 90);
+    }
+
+    #[test]
+    fn zero_height_does_not_panic() {
+        assert_eq!(scroll_offset(3, 0, 2), 2);
+    }
 }
