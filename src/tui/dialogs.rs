@@ -75,8 +75,8 @@ fn draw_new_item_dialog(frame: &mut Frame, app: &App) {
     frame.render_widget(label, chunks[0]);
 
     // Name input
-    let input = Paragraph::new(format!("[{}]", &app.input_buffer))
-        .style(Style::default().fg(Color::Yellow));
+    let input =
+        Paragraph::new(format!("[{}]", app.input_buffer)).style(Style::default().fg(Color::Yellow));
     frame.render_widget(input, chunks[1]);
 
     // Icon label
@@ -174,8 +174,8 @@ fn draw_new_field_dialog(frame: &mut Frame, app: &App) {
     frame.render_widget(value_label, chunks[2]);
 
     // Value input
-    let input = Paragraph::new(format!("[{}]", &app.input_buffer))
-        .style(Style::default().fg(Color::Yellow));
+    let input =
+        Paragraph::new(format!("[{}]", app.input_buffer)).style(Style::default().fg(Color::Yellow));
     frame.render_widget(input, chunks[3]);
 
     // Hint
@@ -347,8 +347,8 @@ fn draw_edit_item_dialog(frame: &mut Frame, app: &App) {
     frame.render_widget(label, chunks[0]);
 
     // Name input
-    let input = Paragraph::new(format!("[{}]", &app.input_buffer))
-        .style(Style::default().fg(Color::Yellow));
+    let input =
+        Paragraph::new(format!("[{}]", app.input_buffer)).style(Style::default().fg(Color::Yellow));
     frame.render_widget(input, chunks[1]);
 
     // Hint
@@ -410,8 +410,8 @@ fn draw_edit_field_dialog(frame: &mut Frame, app: &App) {
     frame.render_widget(label, chunks[2]);
 
     // Value input
-    let input = Paragraph::new(format!("[{}]", &app.input_buffer))
-        .style(Style::default().fg(Color::Yellow));
+    let input =
+        Paragraph::new(format!("[{}]", app.input_buffer)).style(Style::default().fg(Color::Yellow));
     frame.render_widget(input, chunks[3]);
 
     // Hint

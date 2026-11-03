@@ -378,18 +378,18 @@ impl App {
 
     /// Navigate into a folder
     pub fn enter_folder(&mut self) {
-        if let Some(item) = &self.selected_item {
-            if item.folder {
-                // Push current folder to stack
-                self.folder_stack.push((
-                    self.current_folder_id.clone(),
-                    self.current_folder_name.clone(),
-                ));
-                // Enter new folder
-                self.current_folder_id = item.item_id.clone();
-                self.current_folder_name = item.name.clone();
-                self.load_folder_items();
-            }
+        if let Some(item) = &self.selected_item
+            && item.folder
+        {
+            // Push current folder to stack
+            self.folder_stack.push((
+                self.current_folder_id.clone(),
+                self.current_folder_name.clone(),
+            ));
+            // Enter new folder
+            self.current_folder_id = item.item_id.clone();
+            self.current_folder_name = item.name.clone();
+            self.load_folder_items();
         }
     }
 
@@ -488,12 +488,12 @@ impl App {
                 if !self.is_root() && self.left_selected == 0 {
                     // Selected ".." - go back
                     self.go_back();
-                } else if let Some(item) = &self.selected_item {
-                    if item.folder {
-                        self.enter_folder();
-                    }
-                    // For regular items, fields are already shown
+                } else if let Some(item) = &self.selected_item
+                    && item.folder
+                {
+                    self.enter_folder();
                 }
+                // For regular items, fields are already shown
             }
             Panel::Right => {
                 // Show field details
@@ -640,16 +640,16 @@ impl App {
             .get(self.right_selected)
             .map(|f| f.field_id.clone());
 
-        if let (Some(item_id), Some(field_id)) = (item_id, field_id) {
-            if let Some(wallet) = &mut self.wallet {
-                match wallet.delete_field(&item_id, &field_id) {
-                    Ok(_) => {
-                        self.message = Some("Field deleted".to_string());
-                        self.load_fields(&item_id);
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to delete: {}", e));
-                    }
+        if let (Some(item_id), Some(field_id)) = (item_id, field_id)
+            && let Some(wallet) = &mut self.wallet
+        {
+            match wallet.delete_field(&item_id, &field_id) {
+                Ok(_) => {
+                    self.message = Some("Field deleted".to_string());
+                    self.load_fields(&item_id);
+                }
+                Err(e) => {
+                    self.error = Some(format!("Failed to delete: {}", e));
                 }
             }
         }
@@ -703,17 +703,17 @@ impl App {
         }
 
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
-        if let Some(item_id) = item_id {
-            if let Some(wallet) = &mut self.wallet {
-                match wallet.update_item_name(&item_id, &new_name) {
-                    Ok(_) => {
-                        self.message = Some("Item updated".to_string());
-                        self.load_folder_items();
-                        self.select_item_by_name(&new_name);
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to update: {}", e));
-                    }
+        if let Some(item_id) = item_id
+            && let Some(wallet) = &mut self.wallet
+        {
+            match wallet.update_item_name(&item_id, &new_name) {
+                Ok(_) => {
+                    self.message = Some("Item updated".to_string());
+                    self.load_folder_items();
+                    self.select_item_by_name(&new_name);
+                }
+                Err(e) => {
+                    self.error = Some(format!("Failed to update: {}", e));
                 }
             }
         }
@@ -729,16 +729,16 @@ impl App {
             .get(self.right_selected)
             .map(|f| f.field_id.clone());
 
-        if let (Some(item_id), Some(field_id)) = (item_id, field_id) {
-            if let Some(wallet) = &mut self.wallet {
-                match wallet.update_field(&field_id, &new_value, None) {
-                    Ok(_) => {
-                        self.message = Some("Field updated".to_string());
-                        self.load_fields(&item_id);
-                    }
-                    Err(e) => {
-                        self.error = Some(format!("Failed to update: {}", e));
-                    }
+        if let (Some(item_id), Some(field_id)) = (item_id, field_id)
+            && let Some(wallet) = &mut self.wallet
+        {
+            match wallet.update_field(&field_id, &new_value, None) {
+                Ok(_) => {
+                    self.message = Some("Field updated".to_string());
+                    self.load_fields(&item_id);
+                }
+                Err(e) => {
+                    self.error = Some(format!("Failed to update: {}", e));
                 }
             }
         }

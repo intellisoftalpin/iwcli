@@ -10,6 +10,17 @@ use ratatui::{
 
 use super::app::{App, Panel};
 
+/// First list row to draw so that `selected` stays visible, roughly centred.
+pub fn scroll_offset(total_items: usize, visible_height: usize, selected: usize) -> usize {
+    if total_items <= visible_height || selected < visible_height / 2 {
+        0
+    } else if selected >= total_items.saturating_sub(visible_height / 2) {
+        total_items.saturating_sub(visible_height)
+    } else {
+        selected.saturating_sub(visible_height / 2)
+    }
+}
+
 /// Draw the left panel (folder contents)
 pub fn draw_left_panel(frame: &mut Frame, app: &App, area: Rect) {
     let is_active = app.active_panel == Panel::Left;
@@ -89,15 +100,7 @@ pub fn draw_left_panel(frame: &mut Frame, app: &App, area: Rect) {
     let total_items = items.len();
     let selected = app.left_selected;
 
-    let scroll_offset = if total_items <= visible_height {
-        0
-    } else if selected < visible_height / 2 {
-        0
-    } else if selected >= total_items.saturating_sub(visible_height / 2) {
-        total_items.saturating_sub(visible_height)
-    } else {
-        selected.saturating_sub(visible_height / 2)
-    };
+    let scroll_offset = scroll_offset(total_items, visible_height, selected);
 
     // Take only visible items
     let visible_items: Vec<ListItem> = items
@@ -206,15 +209,7 @@ pub fn draw_right_panel(frame: &mut Frame, app: &App, area: Rect) {
     let total_items = items.len();
     let selected = app.right_selected;
 
-    let scroll_offset = if total_items <= visible_height {
-        0
-    } else if selected < visible_height / 2 {
-        0
-    } else if selected >= total_items.saturating_sub(visible_height / 2) {
-        total_items.saturating_sub(visible_height)
-    } else {
-        selected.saturating_sub(visible_height / 2)
-    };
+    let scroll_offset = scroll_offset(total_items, visible_height, selected);
 
     // Take only visible items
     let visible_items: Vec<ListItem> = items

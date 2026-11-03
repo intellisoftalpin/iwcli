@@ -73,12 +73,11 @@ fn run_app<B: Backend<Error = io::Error>>(
 
         terminal.draw(|f| ui::draw(f, app))?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                if events::handle_key(app, key.code) {
-                    return Ok(());
-                }
-            }
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+            && events::handle_key(app, key.code)
+        {
+            return Ok(());
         }
     }
 }
@@ -124,10 +123,10 @@ pub fn show_about() -> io::Result<()> {
 
     // Wait for any key
     loop {
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                break;
-            }
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            break;
         }
     }
 

@@ -264,10 +264,10 @@ fn handle_dialog_key(app: &mut App, key: KeyCode, dialog_type: DialogType) -> bo
                 if app.dialog_selected > 0 {
                     app.dialog_selected -= 1;
                 }
-            } else if matches!(dialog_type, DialogType::ChangePassword) {
-                if app.change_password_focus > 0 {
-                    app.change_password_focus -= 1;
-                }
+            } else if matches!(dialog_type, DialogType::ChangePassword)
+                && app.change_password_focus > 0
+            {
+                app.change_password_focus -= 1;
             }
             false
         }
