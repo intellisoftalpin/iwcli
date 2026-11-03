@@ -278,6 +278,7 @@ impl App {
                             if let Ok(labels) = wallet.get_labels() {
                                 self.labels = labels;
                             }
+                            self.message = unlock_notice(&wallet);
                             self.wallet = Some(wallet);
                             self.wipe_entered_passwords();
                             self.mode = AppMode::Browse;
@@ -733,3 +734,34 @@ impl App {
     }
 }
 
+
+/// Message shown after a successful unlock when iwcore did more than unlock:
+/// the one-time upgrade of an old (pre-v6) vault, records it could not
+/// decrypt, or an old-format snapshot still in the wallet folder.
+fn unlock_notice(wallet: &Wallet) -> Option<String> {
+    let mut parts = Vec::new();
+    if let Some(summary) = wallet.last_migration_summary() {
+        parts.push(format!(
+            "Vault upgraded to the current format ({} items, {} fields)",
+            summary.items_migrated, summary.fields_migrated
+        ));
+    }
+    match wallet.quarantine_count() {
+        Ok(0) | Err(_) => {}
+        Ok(n) => parts.push(format!(
+            "{} old records could not be decrypted and are kept aside",
+            n
+        )),
+    }
+    if wallet.has_pre_v6_snapshot() {
+        parts.push(format!(
+            "old-format copy {} is still in the wallet folder; delete it once you have a current backup",
+            iwcore::business::wallet::PRE_V6_BACKUP_FILENAME
+        ));
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("; "))
+    }
+}
