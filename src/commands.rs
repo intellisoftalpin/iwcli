@@ -174,3 +174,232 @@ fn db_version_number(version: &str) -> u32 {
 fn is_version_compatible(backup_version: &str) -> bool {
     db_version_number(backup_version) <= db_version_number(DB_VERSION)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use iwcore::Wallet;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    const PASSWORD: &str = "correct horse";
+
+    /// Create a wallet through iwcore with one item and one field, closed again.
+    fn make_wallet(dir: &Path) {
+        let mut wallet = Wallet::create(dir, PASSWORD, "en").unwrap();
+        let item = wallet
+            .add_item("Mail", "mail", false, Some(iwcore::ROOT_ID))
+            .unwrap();
+        let label = wallet.get_labels().unwrap()[0].field_type.clone();
+        wallet.add_field(&item, &label, "s3cret", None).unwrap();
+        wallet.close();
+    }
+
+    /// Write a ZIP holding `nswallet.dat` with the given bytes.
+    fn write_zip(path: &Path, db_bytes: &[u8]) {
+        let file = std::fs::File::create(path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file(DATABASE_FILENAME, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(db_bytes).unwrap();
+        zip.finish().unwrap();
+    }
+
+    fn only_backup(folder: &Path) -> PathBuf {
+        let list = BackupManager::new(folder).list_backups().unwrap();
+        assert_eq!(list.len(), 1);
+        list[0].path.clone()
+    }
+
+    #[test]
+    fn backup_writes_a_manual_backup_and_creates_the_folder() {
+        let tmp = TempDir::new().unwrap();
+        let wallet = tmp.path().join("wallet");
+        let folder = tmp.path().join("nested").join("backups");
+        make_wallet(&wallet);
+
+        let path = backup(&wallet, &folder).unwrap();
+
+        assert!(path.is_file());
+        assert_eq!(path.parent().unwrap(), folder);
+        let list = BackupManager::new(&folder).list_backups().unwrap();
+        assert_eq!(list.len(), 1);
+        assert!(matches!(list[0].backup_type, BackupType::Manual));
+    }
+
+    #[test]
+    fn backup_without_wallet_database_fails() {
+        let tmp = TempDir::new().unwrap();
+        let err = backup(tmp.path(), &tmp.path().join("b")).unwrap_err();
+        assert!(err.starts_with("wallet database not found"), "{err}");
+        assert!(!tmp.path().join("b").exists());
+    }
+
+    #[test]
+    fn backups_lists_header_and_one_line_per_backup() {
+        let tmp = TempDir::new().unwrap();
+        let wallet = tmp.path().join("wallet");
+        let folder = tmp.path().join("backups");
+        make_wallet(&wallet);
+        let path = backup(&wallet, &folder).unwrap();
+
+        let lines = backups(&folder).unwrap();
+
+        assert_eq!(lines.len(), 3);
+        assert!(lines[0].starts_with("Date"));
+        assert!(lines[0].ends_with("Filename"));
+        assert_eq!(lines[1], "-".repeat(70));
+        let name = path.file_name().unwrap().to_str().unwrap();
+        assert!(lines[2].contains("manual"), "{}", lines[2]);
+        assert!(lines[2].ends_with(name), "{}", lines[2]);
+    }
+
+    #[test]
+    fn backups_in_empty_folder_says_none_found() {
+        let tmp = TempDir::new().unwrap();
+        let lines = backups(tmp.path()).unwrap();
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].starts_with("No backups found in "));
+    }
+
+    #[test]
+    fn restore_with_correct_password_gives_a_working_wallet() {
+        let tmp = TempDir::new().unwrap();
+        let wallet = tmp.path().join("wallet");
+        let folder = tmp.path().join("backups");
+        make_wallet(&wallet);
+        let file = backup(&wallet, &folder).unwrap();
+        let target = tmp.path().join("restored");
+
+        let outcome = restore(&target, &file, Some(PASSWORD)).unwrap();
+
+        assert_eq!(outcome.db_path, target.join(DATABASE_FILENAME));
+        assert_eq!(outcome.inspection.db_version, DB_VERSION);
+        assert_eq!(outcome.inspection.item_count, 1);
+        assert!(!outcome.needs_upgrade());
+        let mut restored = Wallet::open(&target).unwrap();
+        assert!(restored.unlock(PASSWORD).unwrap());
+        let items = restored.get_items_by_parent(iwcore::ROOT_ID).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "Mail");
+    }
+
+    #[test]
+    fn restore_without_password_replaces_the_database() {
+        let tmp = TempDir::new().unwrap();
+        let wallet = tmp.path().join("wallet");
+        make_wallet(&wallet);
+        let file = backup(&wallet, &tmp.path().join("b")).unwrap();
+        // An existing wallet in the target is replaced.
+        let target = tmp.path().join("other");
+        Wallet::create(&target, "other password", "en")
+            .unwrap()
+            .close();
+
+        restore(&target, &file, None).unwrap();
+
+        let mut restored = Wallet::open(&target).unwrap();
+        assert!(restored.unlock(PASSWORD).unwrap());
+    }
+
+    #[test]
+    fn restore_with_wrong_password_leaves_the_target_untouched() {
+        let tmp = TempDir::new().unwrap();
+        let wallet = tmp.path().join("wallet");
+        make_wallet(&wallet);
+        backup(&wallet, &tmp.path().join("b")).unwrap();
+        let file = only_backup(&tmp.path().join("b"));
+        let target = tmp.path().join("restored");
+
+        let err = restore(&target, &file, Some("wrong")).unwrap_err();
+
+        assert_eq!(err, "incorrect password");
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn restore_of_missing_file_fails() {
+        let tmp = TempDir::new().unwrap();
+        let err = restore(tmp.path(), &tmp.path().join("nope.zip"), None).unwrap_err();
+        assert!(err.starts_with("backup file not found"), "{err}");
+    }
+
+    #[test]
+    fn restore_refuses_a_file_that_is_not_a_zip() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("fake.zip");
+        std::fs::write(&file, b"definitely not a zip").unwrap();
+        let err = restore(&tmp.path().join("w"), &file, None).unwrap_err();
+        assert!(err.starts_with("backup verification failed"), "{err}");
+        assert!(!tmp.path().join("w").exists());
+    }
+
+    #[test]
+    fn restore_refuses_a_zip_with_an_empty_database() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("empty.zip");
+        write_zip(&file, b"");
+        let err = restore(&tmp.path().join("w"), &file, None).unwrap_err();
+        assert_eq!(err, "backup file is invalid or empty");
+    }
+
+    #[test]
+    fn restore_refuses_a_database_that_is_not_sqlite() {
+        let tmp = TempDir::new().unwrap();
+        let wallet = tmp.path().join("wallet");
+        make_wallet(&wallet);
+        let before = std::fs::read(wallet.join(DATABASE_FILENAME)).unwrap();
+        let file = tmp.path().join("bad.zip");
+        write_zip(&file, &[0x42; 4096]);
+
+        let err = restore(&wallet, &file, None).unwrap_err();
+
+        assert!(err.starts_with("backup refused"), "{err}");
+        assert_eq!(
+            std::fs::read(wallet.join(DATABASE_FILENAME)).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn restore_refuses_an_sqlite_file_without_wallet_tables() {
+        let tmp = TempDir::new().unwrap();
+        // A valid SQLite header followed by garbage pages.
+        let mut db = b"SQLite format 3\0".to_vec();
+        db.resize(4096, 0xAB);
+        let file = tmp.path().join("crafted.zip");
+        write_zip(&file, &db);
+        let target = tmp.path().join("w");
+
+        let err = restore(&target, &file, Some(PASSWORD)).unwrap_err();
+
+        assert!(err.starts_with("backup refused"), "{err}");
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn version_compatibility() {
+        assert!(is_version_compatible(DB_VERSION));
+        assert!(is_version_compatible("5"));
+        assert!(is_version_compatible("garbage")); // counts as 1, like iwcore
+        assert!(!is_version_compatible("7"));
+        assert!(!is_version_compatible("99"));
+    }
+
+    #[test]
+    fn backup_type_names() {
+        assert_eq!(backup_type_name(&BackupType::Auto), "auto");
+        assert_eq!(backup_type_name(&BackupType::Manual), "manual");
+        assert_eq!(backup_type_name(&BackupType::Imported), "imported");
+    }
+
+    #[test]
+    fn sizes_are_formatted_in_b_kb_mb() {
+        assert_eq!(format_size(0), "0 B");
+        assert_eq!(format_size(1023), "1023 B");
+        assert_eq!(format_size(1024), "1.0 KB");
+        assert_eq!(format_size(1536), "1.5 KB");
+        assert_eq!(format_size(1024 * 1024), "1.0 MB");
+        assert_eq!(format_size(5 * 1024 * 1024 + 512 * 1024), "5.5 MB");
+    }
+}

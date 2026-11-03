@@ -144,3 +144,147 @@ fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
+        Cli::try_parse_from(std::iter::once("iwcli").chain(args.iter().copied()))
+    }
+
+    #[test]
+    fn clap_definition_is_valid() {
+        Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn no_arguments_starts_the_tui_without_wallet() {
+        let cli = parse(&[]).unwrap();
+        assert!(cli.wallet.is_none());
+        assert!(cli.command.is_none());
+    }
+
+    #[test]
+    fn wallet_option_short_and_long() {
+        assert_eq!(
+            parse(&["-w", "/tmp/w"]).unwrap().wallet.as_deref(),
+            Some("/tmp/w")
+        );
+        assert_eq!(
+            parse(&["--wallet", "/tmp/w"]).unwrap().wallet.as_deref(),
+            Some("/tmp/w")
+        );
+    }
+
+    #[test]
+    fn backup_command() {
+        let cli = parse(&["--wallet", "w", "backup", "--backup-folder", "b"]).unwrap();
+        assert_eq!(cli.wallet.as_deref(), Some("w"));
+        match cli.command {
+            Some(Commands::Backup { backup_folder }) => assert_eq!(backup_folder, "b"),
+            _ => panic!("expected backup"),
+        }
+    }
+
+    #[test]
+    fn backup_requires_backup_folder() {
+        let err = parse(&["--wallet", "w", "backup"]).err().unwrap();
+        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+    }
+
+    #[test]
+    fn restore_command_with_and_without_password() {
+        match parse(&["-w", "w", "restore", "--backup", "f.zip"])
+            .unwrap()
+            .command
+        {
+            Some(Commands::Restore { backup, password }) => {
+                assert_eq!(backup, "f.zip");
+                assert_eq!(password, None);
+            }
+            _ => panic!("expected restore"),
+        }
+        match parse(&[
+            "-w",
+            "w",
+            "restore",
+            "--backup",
+            "f.zip",
+            "--password",
+            "pw",
+        ])
+        .unwrap()
+        .command
+        {
+            Some(Commands::Restore { password, .. }) => {
+                assert_eq!(password.as_deref(), Some("pw"))
+            }
+            _ => panic!("expected restore"),
+        }
+    }
+
+    #[test]
+    fn restore_requires_backup() {
+        let err = parse(&["-w", "w", "restore"]).err().unwrap();
+        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+    }
+
+    #[test]
+    fn backups_command_needs_no_wallet() {
+        let cli = parse(&["backups", "--backup-folder", "b"]).unwrap();
+        assert!(cli.wallet.is_none());
+        assert!(
+            matches!(cli.command, Some(Commands::Backups { backup_folder }) if backup_folder == "b")
+        );
+    }
+
+    #[test]
+    fn wallet_option_is_global_to_the_top_level_only() {
+        // --wallet goes before the subcommand.
+        assert!(parse(&["backup", "--backup-folder", "b", "--wallet", "w"]).is_err());
+    }
+
+    #[test]
+    fn other_commands_parse() {
+        assert!(matches!(
+            parse(&["version"]).unwrap().command,
+            Some(Commands::Version)
+        ));
+        assert!(matches!(
+            parse(&["unlock"]).unwrap().command,
+            Some(Commands::Unlock)
+        ));
+        assert!(matches!(
+            parse(&["lock"]).unwrap().command,
+            Some(Commands::Lock)
+        ));
+        assert!(matches!(
+            parse(&["list"]).unwrap().command,
+            Some(Commands::List { parent_id: None })
+        ));
+        assert!(matches!(
+            parse(&["show", "abc"]).unwrap().command,
+            Some(Commands::Show { item_id }) if item_id == "abc"
+        ));
+        assert!(matches!(
+            parse(&["search", "mail"]).unwrap().command,
+            Some(Commands::Search { query }) if query == "mail"
+        ));
+    }
+
+    #[test]
+    fn unknown_command_is_an_error() {
+        let err = parse(&["frobnicate"]).err().unwrap();
+        assert_eq!(err.kind(), clap::error::ErrorKind::InvalidSubcommand);
+    }
+
+    #[test]
+    fn require_wallet_returns_the_path() {
+        assert_eq!(
+            require_wallet(Some("/tmp/w"), "backup"),
+            Path::new("/tmp/w")
+        );
+    }
+}

@@ -29,3 +29,6 @@ ratatui = "0.30"
 # TOTP
 totp-rs = { version = "6.0", default-features = false, features = ["std", "otpauth", "zeroize"] }
 base32 = "0.5"
+
+[dev-dependencies]
+zip = { version = "9.3", default-features = false, features = ["deflate"] }

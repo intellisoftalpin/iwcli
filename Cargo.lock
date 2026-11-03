@@ -1313,6 +1313,7 @@ dependencies = [
  "tempfile",
  "totp-rs",
  "zeroize",
+ "zip",
 ]
 
 [[package]]

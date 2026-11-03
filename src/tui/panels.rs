@@ -221,3 +221,37 @@ pub fn draw_right_panel(frame: &mut Frame, app: &App, area: Rect) {
     let list = List::new(visible_items);
     frame.render_widget(list, inner);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::scroll_offset;
+
+    #[test]
+    fn no_scroll_when_everything_fits() {
+        assert_eq!(scroll_offset(5, 10, 4), 0);
+        assert_eq!(scroll_offset(10, 10, 9), 0);
+    }
+
+    #[test]
+    fn no_scroll_near_the_top() {
+        assert_eq!(scroll_offset(100, 10, 0), 0);
+        assert_eq!(scroll_offset(100, 10, 4), 0);
+    }
+
+    #[test]
+    fn selection_is_centred_in_the_middle() {
+        assert_eq!(scroll_offset(100, 10, 5), 0);
+        assert_eq!(scroll_offset(100, 10, 50), 45);
+    }
+
+    #[test]
+    fn last_page_is_pinned_at_the_end() {
+        assert_eq!(scroll_offset(100, 10, 95), 90);
+        assert_eq!(scroll_offset(100, 10, 99), 90);
+    }
+
+    #[test]
+    fn zero_height_does_not_panic() {
+        assert_eq!(scroll_offset(3, 0, 2), 2);
+    }
+}
