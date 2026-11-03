@@ -3,6 +3,13 @@
 use std::path::{Path, PathBuf};
 
 use iwcore::{IWField, IWItem, IWLabel, Wallet, ROOT_ID};
+use zeroize::{Zeroize, Zeroizing};
+
+/// An empty buffer for a typed password. It is wiped on drop, and the
+/// capacity is reserved up front so typing does not leave reallocated copies.
+fn secret_buffer() -> Zeroizing<String> {
+    Zeroizing::new(String::with_capacity(128))
+}
 
 /// Application mode
 #[derive(Debug, Clone, PartialEq)]
@@ -88,16 +95,16 @@ pub struct App {
     pub error: Option<String>,
 
     // Password entry
-    pub password_input: String,
-    pub password_confirm: String,
+    pub password_input: Zeroizing<String>,
+    pub password_confirm: Zeroizing<String>,
     pub password_error: Option<String>,
     /// Which field is focused in create wallet screen (0 = password, 1 = confirm)
     pub create_wallet_focus: usize,
 
     // Change password dialog
-    pub old_password: String,
-    pub new_password: String,
-    pub new_password_confirm: String,
+    pub old_password: Zeroizing<String>,
+    pub new_password: Zeroizing<String>,
+    pub new_password_confirm: Zeroizing<String>,
     /// Which field is focused (0 = old, 1 = new, 2 = confirm)
     pub change_password_focus: usize,
 }
@@ -142,23 +149,21 @@ impl App {
             message: None,
             error: None,
 
-            password_input: String::new(),
-            password_confirm: String::new(),
+            password_input: secret_buffer(),
+            password_confirm: secret_buffer(),
             password_error: None,
             create_wallet_focus: 0,
 
-            old_password: String::new(),
-            new_password: String::new(),
-            new_password_confirm: String::new(),
+            old_password: secret_buffer(),
+            new_password: secret_buffer(),
+            new_password_confirm: secret_buffer(),
             change_password_focus: 0,
         }
     }
 
     /// Open change password dialog
     pub fn open_change_password_dialog(&mut self) {
-        self.old_password.clear();
-        self.new_password.clear();
-        self.new_password_confirm.clear();
+        self.wipe_change_password_fields();
         self.change_password_focus = 0;
         self.password_error = None;
         self.mode = AppMode::Dialog(DialogType::ChangePassword);
@@ -202,6 +207,7 @@ impl App {
             match wallet.change_password(&self.new_password) {
                 Ok(_) => {
                     self.message = Some("Password changed successfully".to_string());
+                    self.wipe_change_password_fields();
                     self.close_dialog();
                     true
                 }
@@ -244,6 +250,7 @@ impl App {
                         self.labels = labels;
                     }
                     self.wallet = Some(wallet);
+                    self.wipe_entered_passwords();
                     self.mode = AppMode::Browse;
                     self.load_folder_items();
                     self.password_error = None;
@@ -272,6 +279,7 @@ impl App {
                                 self.labels = labels;
                             }
                             self.wallet = Some(wallet);
+                            self.wipe_entered_passwords();
                             self.mode = AppMode::Browse;
                             self.load_folder_items();
                             self.password_error = None;
@@ -279,19 +287,19 @@ impl App {
                         }
                         Ok(false) => {
                             self.password_error = Some("Invalid password".to_string());
-                            self.password_input.clear();
+                            self.password_input.zeroize();
                             false
                         }
                         Err(e) => {
                             self.password_error = Some(format!("Error: {}", e));
-                            self.password_input.clear();
+                            self.password_input.zeroize();
                             false
                         }
                     }
                 }
                 Err(e) => {
                     self.password_error = Some(format!("Cannot open wallet: {}", e));
-                    self.password_input.clear();
+                    self.password_input.zeroize();
                     false
                 }
             }
@@ -579,7 +587,7 @@ impl App {
     pub fn create_field(&mut self) {
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
         let field_type = self.labels.get(self.dialog_selected).map(|l| l.field_type.clone());
-        let value = self.input_buffer.trim().to_string();
+        let value = Zeroizing::new(self.input_buffer.trim().to_string());
 
         if let (Some(item_id), Some(field_type)) = (item_id, field_type) {
             if let Some(wallet) = &mut self.wallet {
@@ -596,6 +604,7 @@ impl App {
         } else {
             self.error = Some("Invalid field type".to_string());
         }
+        self.input_buffer.zeroize();
         self.mode = AppMode::Browse;
     }
 
@@ -639,8 +648,22 @@ impl App {
     /// Close dialog
     pub fn close_dialog(&mut self) {
         self.mode = AppMode::Browse;
-        self.input_buffer.clear();
+        // The buffer may hold a field value (a password) being edited.
+        self.input_buffer.zeroize();
         self.input_secondary.clear();
+    }
+
+    /// Wipe the passwords typed on the unlock / create wallet screen.
+    fn wipe_entered_passwords(&mut self) {
+        self.password_input.zeroize();
+        self.password_confirm.zeroize();
+    }
+
+    /// Wipe the passwords typed in the change password dialog.
+    pub fn wipe_change_password_fields(&mut self) {
+        self.old_password.zeroize();
+        self.new_password.zeroize();
+        self.new_password_confirm.zeroize();
     }
 
     /// Open edit item dialog
@@ -688,7 +711,7 @@ impl App {
 
     /// Update field value
     pub fn update_field(&mut self) {
-        let new_value = self.input_buffer.trim().to_string();
+        let new_value = Zeroizing::new(self.input_buffer.trim().to_string());
         let item_id = self.selected_item.as_ref().map(|i| i.item_id.clone());
         let field_id = self.fields.get(self.right_selected).map(|f| f.field_id.clone());
 
@@ -705,6 +728,8 @@ impl App {
                 }
             }
         }
+        self.input_buffer.zeroize();
         self.mode = AppMode::Browse;
     }
 }
+
