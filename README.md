@@ -15,7 +15,17 @@ Command-line interface for IntelliWallet password manager.
 
 ## Installation
 
-iwcli is not published on crates.io. Build it from source (Rust 1.90 or newer):
+### Prebuilt binaries
+
+Every release on the [Releases page](https://github.com/intellisoftalpin/iwcli/releases) has binaries for Linux (x86_64, ARM64), macOS (Apple Silicon, Intel) and Windows (x86_64), with a `SHA256SUMS` file. Check the download against it before running it:
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+### From source
+
+Rust 1.90 or newer:
 
 ```bash
 git clone https://github.com/intellisoftalpin/iwcli.git
