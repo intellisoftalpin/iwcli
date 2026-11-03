@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use super::app::{App, DialogType};
-use super::panels::generate_totp;
+use crate::totp::generate_totp;
 
 /// Draw a dialog based on type
 pub fn draw_dialog(frame: &mut Frame, app: &App, dialog_type: &DialogType) {
