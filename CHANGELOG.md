@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.4
+
+### Changed
+
+- iwcore 0.7.1: a vault upgraded from the old format is compacted once at its
+  next unlock, backups from elsewhere are checked more strictly before a
+  restore, and new wallet and backup files are private to their owner.
+- `restore` asks for the backup password on the terminal with the input
+  hidden (Enter skips the check). `--password` still works for scripts and
+  prints a warning, since it leaves the password in shell history and in the
+  process list.
+- Wallet and backup folders created by iwcli are private to their owner (0700).
+
 ## 0.1.3
 
 ### Added

@@ -57,7 +57,10 @@ enum Commands {
         /// Path to the backup ZIP file
         #[arg(long)]
         backup: String,
-        /// Password to verify after restore (optional)
+        /// Password to check against the backup before restoring. Without it
+        /// iwcli asks for it on the terminal (input hidden; Enter skips the
+        /// check). Passing it here leaves it in shell history and visible to
+        /// other users' `ps`: for scripts only.
         #[arg(long)]
         password: Option<String>,
     },
@@ -83,6 +86,22 @@ fn require_wallet<'a>(wallet: Option<&'a str>, command: &str) -> &'a Path {
     }
 }
 
+/// Ask for the backup password with echo off, when there is a terminal to ask
+/// on. An empty answer, or no terminal (a script), skips the password check.
+fn ask_backup_password() -> Option<Zeroizing<String>> {
+    use std::io::IsTerminal;
+    if !std::io::stdin().is_terminal() {
+        return None;
+    }
+    match rpassword::prompt_password("Backup password (Enter to skip the check): ") {
+        Ok(typed) => {
+            let typed = Zeroizing::new(typed);
+            (!typed.is_empty()).then_some(typed)
+        }
+        Err(e) => fail(&format!("could not read the password: {}", e)),
+    }
+}
+
 fn main() {
     let mut cli = Cli::parse();
 
@@ -100,7 +119,15 @@ fn main() {
         }
         Some(Commands::Restore { backup, password }) => {
             // Keep the password only in a buffer that is wiped on drop.
-            let password = password.take().map(Zeroizing::new);
+            let password = match password.take() {
+                Some(given) => {
+                    eprintln!(
+                        "Warning: --password leaves the password in shell history and visible to other users; omit it to be asked instead."
+                    );
+                    Some(Zeroizing::new(given))
+                }
+                None => ask_backup_password(),
+            };
             let wallet = require_wallet(cli.wallet.as_deref(), "restore");
             match commands::restore(
                 wallet,
