@@ -42,6 +42,7 @@ pub fn backup(wallet_path: &Path, backup_folder: &Path) -> Result<PathBuf, Strin
     if !backup_folder.exists() {
         std::fs::create_dir_all(backup_folder)
             .map_err(|e| format!("failed to create backup folder: {}", e))?;
+        private_dir(backup_folder)?;
     }
 
     BackupManager::new(backup_folder)
@@ -57,6 +58,21 @@ pub fn backup(wallet_path: &Path, backup_folder: &Path) -> Result<PathBuf, Strin
 /// temporary copy, and its version must not be newer than this build's.
 /// An optional password is verified on that copy too; nothing is migrated or
 /// written there. The restore itself replaces the database atomically.
+/// A folder this tool created for a wallet or its backups is readable by its
+/// owner only (0700), like the folders iwcore 0.7 creates itself. No-op off
+/// Unix.
+fn private_dir(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
+            .map_err(|e| format!("failed to restrict {}: {}", path.display(), e))?;
+    }
+    #[cfg(not(unix))]
+    let _ = path;
+    Ok(())
+}
+
 pub fn restore(
     wallet_path: &Path,
     backup_file: &Path,
@@ -97,6 +113,7 @@ pub fn restore(
     if !wallet_path.exists() {
         std::fs::create_dir_all(wallet_path)
             .map_err(|e| format!("failed to create wallet folder: {}", e))?;
+        private_dir(wallet_path)?;
     }
 
     let db_path = wallet_path.join(DATABASE_FILENAME);
@@ -225,6 +242,23 @@ mod tests {
         let list = BackupManager::new(&folder).list_backups().unwrap();
         assert_eq!(list.len(), 1);
         assert!(matches!(list[0].backup_type, BackupType::Manual));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn folders_this_tool_creates_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        let tmp = TempDir::new().unwrap();
+        let wallet = tmp.path().join("wallet");
+        let folder = tmp.path().join("backups");
+        make_wallet(&wallet);
+        let file = backup(&wallet, &folder).unwrap();
+        assert_eq!(mode(&folder), 0o700);
+
+        let target = tmp.path().join("restored");
+        restore(&target, &file, None).unwrap();
+        assert_eq!(mode(&target), 0o700);
     }
 
     #[test]
