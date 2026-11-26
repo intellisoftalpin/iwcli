@@ -498,10 +498,7 @@ fn draw_field_details_dialog(frame: &mut Frame, app: &App) {
         frame.render_widget(value_text, chunks[5]);
 
         // Changed timestamp
-        let changed = field
-            .change_timestamp
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
+        let changed = iwcore::database::queries::format_timestamp(&field.change_timestamp);
         let changed_text = Paragraph::new(format!("Changed: {}", changed))
             .style(Style::default().fg(Color::DarkGray));
         frame.render_widget(changed_text, chunks[7]);

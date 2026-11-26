@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5
+
+### Changed
+
+- iwcore 0.8.0: dates now come from `jiff` instead of the unmaintained
+  `chrono` (RUSTSEC-2026-0543). Backup lists and field details print the
+  same `YYYY-MM-DD HH:MM:SS` UTC times as before.
+
 ## 0.1.4
 
 ### Changed
