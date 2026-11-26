@@ -146,7 +146,7 @@ pub fn backups(backup_folder: &Path) -> Result<Vec<String>, String> {
         "-".repeat(70),
     ];
     for info in &list {
-        let date_str = info.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+        let date_str = iwcore::database::queries::format_timestamp(&info.timestamp);
         let type_str = backup_type_name(&info.backup_type);
         let size_str = format_size(info.size);
         let filename = info
